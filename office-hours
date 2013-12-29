@@ -43,7 +43,7 @@ def initialize() {
 
 def presenceHandler(evt) {
 	if (evt.value == "present") {
-    	state.present = true
+		state.present = true
 		switches.on()
 	} else if (evt.value == "not present") {
 		switches.off()
