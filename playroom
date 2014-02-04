@@ -1,0 +1,91 @@
+/**
+ *  Gerakines Playroom
+ *
+ *  Author: nick@gerakines.net
+ *  Date: 2014-02-04
+ */
+preferences {
+	section("When at least one of the following presence sensors is present...") {
+		input "people", "capability.presenceSensor", title: "Which sensors?", multiple: true
+	}
+	section("Turn on when there's movement..."){
+		input "motion1", "capability.motionSensor", title: "Where?"
+	}
+	section("And off when there's been no movement for..."){
+		input "minutes1", "number", title: "Minutes?"
+	}
+	section("Turn on/off switches..."){
+		input "switches", "capability.switch", multiple: true
+	}
+}
+
+def installed() {
+	log.debug "Installed with settings: ${settings}"
+
+	initialize()
+}
+
+def updated() {
+	log.debug "Updated with settings: ${settings}"
+
+	unsubscribe()
+	unschedule()
+	initialize()
+}
+
+def initialize() {
+	subscribe(people, "presence", presence)
+	subscribe(motion1, "motion", motionHandler)
+	schedule("0 * * * * ?", "scheduleCheck")
+
+	state.present = isAnyoneHome()
+}
+
+def presenceHandler(evt) {
+	state.present = isAnyoneHome()
+	if (state.present == false) {
+		switches.off()
+	}
+}
+
+def motionHandler(evt) {
+	if (evt.value == "active") {
+		if (state.present == true) {
+			switches.each {
+				if (it.currentState("switch").value == "off") {
+					log.debug "turning ${it.label ?: it.name} on."
+					it.on()
+				}
+			}
+			state.inactiveAt = null
+		}
+	} else if (evt.value == "inactive" && !state.inactiveAt) {
+		state.inactiveAt = now()
+	}
+}
+
+def scheduleCheck() {
+	state.present = isAnyoneHome()
+	if (state.inactiveAt) {
+		def elapsed = now() - state.inactiveAt
+		def threshold = 1000 * 60 * minutes1
+		if (elapsed >= threshold) {
+			log.debug "turning off lights"
+			switches.off()
+			state.inactiveAt = null
+		}
+	}
+}
+
+
+private isAnyoneHome() {
+	def result = false
+	for (person in people) {
+		if (person.currentPresence == "present") {
+			result = true
+			break
+		}
+	}
+	log.debug "isAnyoneHome: $result"
+	return result
+}
