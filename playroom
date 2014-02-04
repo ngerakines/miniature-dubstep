@@ -34,7 +34,7 @@ def updated() {
 }
 
 def initialize() {
-	subscribe(people, "presence", presence)
+	subscribe(people, "presence", presenceHandler)
 	subscribe(motion1, "motion", motionHandler)
 	schedule("0 * * * * ?", "scheduleCheck")
 
@@ -44,11 +44,18 @@ def initialize() {
 def presenceHandler(evt) {
 	state.present = isAnyoneHome()
 	if (state.present == false) {
-		switches.off()
+		switches.each {
+			log.debug "switch is currently ${it.currentState("switch").value}"
+			if (it.currentState("switch").value == "on") {
+				log.debug "turning ${it.label ?: it.name} off."
+				it.off()
+			}
+		}
 	}
 }
 
 def motionHandler(evt) {
+	log.debug "motionHandler event value ${evt.value}"
 	if (evt.value == "active") {
 		if (state.present == true) {
 			switches.each {
@@ -66,12 +73,18 @@ def motionHandler(evt) {
 
 def scheduleCheck() {
 	state.present = isAnyoneHome()
+	log.debug "scheduleCheck, state.present = ${state.present}"
 	if (state.inactiveAt) {
 		def elapsed = now() - state.inactiveAt
 		def threshold = 1000 * 60 * minutes1
 		if (elapsed >= threshold) {
-			log.debug "turning off lights"
-			switches.off()
+			switches.each {
+				log.debug "switch is currently ${it.currentState("switch").value}"
+				if (it.currentState("switch").value == "on") {
+					log.debug "turning ${it.label ?: it.name} off."
+					it.off()
+				}
+			}
 			state.inactiveAt = null
 		}
 	}
@@ -86,6 +99,5 @@ private isAnyoneHome() {
 			break
 		}
 	}
-	log.debug "isAnyoneHome: $result"
 	return result
 }
