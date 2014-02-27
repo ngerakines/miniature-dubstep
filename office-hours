@@ -5,7 +5,7 @@
  *  Date: 2013-12-28
  */
 preferences {
-	section("When a presence sensor arrives or departs this location...") {
+    section("When a presence sensor arrives or departs this location..") {
 		input "presence", "capability.presenceSensor", title: "Which sensor?"
 	}
 	section("Turn on when there's movement..."){
@@ -20,62 +20,59 @@ preferences {
 }
 
 def installed() {
-	log.debug "Installed with settings: ${settings}"
-
 	initialize()
 }
 
 def updated() {
-	log.debug "Updated with settings: ${settings}"
-
 	unsubscribe()
-	unschedule()
+    unschedule()
 	initialize()
 }
 
 def initialize() {
-	subscribe(presence, "presence", presenceHandler)
+    subscribe(presence, "presence", presenceHandler)
 	subscribe(motion1, "motion", motionHandler)
 	schedule("0 * * * * ?", "scheduleCheck")
-
-	state.present = presence.currentState("presence")
+    
+    state.present = presence.currentState("presence")
 }
 
 def presenceHandler(evt) {
+	log.debug "presence value is ${evt.value}"
 	if (evt.value == "present") {
 		state.present = true
 		switches.on()
 	} else if (evt.value == "not present") {
-		switches.off()
-		state.present = false
+        switches.off()
+        state.present = false
 	}
 }
 
 def motionHandler(evt) {
+	log.debug "motion value is ${evt.value}"
 	if (evt.value == "active") {
-		if (state.present == true) {
-			switches.each {
-				if (it.currentState("switch").value == "off") {
-					log.debug "turning ${it.label ?: it.name} on."
-					it.on()
-				}
-			}
+    	if (state.present == true) {
+            switches.each {
+            	if (it.currentState("switch").value == "off") {
+              		it.on()
+                }
+            }
 			state.inactiveAt = null
-		}
+        }
 	} else if (evt.value == "inactive" && !state.inactiveAt) {
 		state.inactiveAt = now()
 	}
 }
 
 def scheduleCheck() {
+	log.debug "presence is currently ${presence.currentState("presence").value}"
 	if (presence.currentState("presence").value == "present") {
-		state.present = true
+ 		state.present = true
 	}
 	if (state.inactiveAt) {
 		def elapsed = now() - state.inactiveAt
 		def threshold = 1000 * 60 * minutes1
 		if (elapsed >= threshold) {
-			log.debug "turning off lights"
 			switches.off()
 			state.inactiveAt = null
 		}
